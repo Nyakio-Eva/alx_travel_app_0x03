@@ -7,7 +7,7 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Listing, Booking, Payment
 from .serializers import ListingSerializer, BookingSerializer
-from .tasks import send_payment_confirmation_email
+from .tasks import send_payment_confirmation_email, send_booking_confirmation_email
 
 
 from django.conf import settings
@@ -122,6 +122,17 @@ class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
 
+
+
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+
+    def perform_create(self, serializer):
+        booking = serializer.save(user=self.request.user)
+        # Trigger Celery task
+        send_booking_confirmation_email.delay(
+            booking.user.email,
+            booking.listing.title,
+            booking.date
+        )
